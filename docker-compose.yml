@@ -1,5 +1,5 @@
 db:
-  image: onjin/alpine-postgres:9.6
+  image: postgres:12-alpine
   ports:
     - "5434:5432"
   environment:
@@ -7,11 +7,19 @@ db:
 web:
   build: .
   volumes:
-    - .:/thredded
-    # Ignore these directories
-    - /thredded/.bundle
-    - /thredded/tmp/cache
-    - /thredded/tmp/pids
+    - ./.rubocop.yml:/thredded/.rubocop.yml
+    - ./.rspec:/thredded/.rspec
+    - ./Rakefile:/thredded/Rakefile
+    - ./config.ru:/thredded/config.ru
+    - ./app:/thredded/app
+    - ./bin:/thredded/bin
+    - ./config:/thredded/config
+    - ./db:/thredded/db
+    - ./lib:/thredded/lib
+    - ./script:/thredded/script
+    - ./spec:/thredded/spec
+    - ./vendor:/thredded/vendor
+    # Ignore these paths
     - /thredded/spec/dummy/tmp/
   working_dir: /thredded
   environment:
@@ -20,8 +28,9 @@ web:
     DB_PASSWORD:
   command: >
     bash -c 'script/wait-for-tcp $$DB_1_PORT_5432_TCP_ADDR $$DB_1_PORT_5432_TCP_PORT &&
-             bundle exec rake db:drop db:create db:migrate db:seed &&
-             bundle exec rake dev:server'
+             bundle exec rake db:drop db:create db:migrate &&
+             bundle exec rake db:seed &&
+             bin/rails server --port 9292 --binding 0.0.0.0'
   ports:
     - "9292:9292"
   links:

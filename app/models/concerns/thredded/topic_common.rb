@@ -14,7 +14,9 @@ module Thredded
       scope :order_recently_posted_first, -> { order(last_post_at: :desc, id: :desc) }
       scope :on_page, ->(page_num) { page(page_num) }
 
-      validates :hash_id, presence: true, uniqueness: true
+      validates :hash_id,
+                presence: true,
+                uniqueness: { case_sensitive: true }
       validates :posts_count, numericality: true
 
       validates :title, presence: true, length: { within: Thredded.topic_title_length_range }
@@ -53,9 +55,19 @@ module Thredded
         topics = arel_table
         reads_class = reflect_on_association(:user_read_states).klass
         reads = reads_class.arel_table
-        joins(topics.join(reads, Arel::Nodes::OuterJoin)
-                .on(topics[:id].eq(reads[:postable_id]).and(reads[:user_id].eq(user.id))).join_sources)
-          .merge(reads_class.where(reads[:id].eq(nil).or(reads[:unread_posts_count].not_eq(0))))
+
+        joins_reads =
+          topics.outer_join(reads)
+            .on(topics[:id].eq(reads[:postable_id]).and(reads[:user_id].eq(user.id))).join_sources
+
+        unread_scope = reads_class.where(reads[:id].eq(nil).or(reads[:unread_posts_count].not_eq(0)))
+
+        # Work around https://github.com/rails/rails/issues/36761
+        if Thredded.rails_gte_600_rc_2?
+          merge(unread_scope).joins(joins_reads)
+        else
+          joins(joins_reads).merge(unread_scope)
+        end
       end
 
       private
