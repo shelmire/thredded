@@ -2,10 +2,10 @@
 
 module Thredded
   class MessageboardsController < Thredded::ApplicationController
-    before_action :thredded_require_login!, only: %i[new create edit update]
+    before_action :thredded_require_login!, only: %i[new create edit update destroy]
 
     after_action :verify_authorized, except: %i[index]
-    after_action :verify_policy_scoped, except: %i[new create edit update]
+    after_action :verify_policy_scoped, except: %i[new create edit update destroy]
 
     def index
       @groups = Thredded::MessageboardGroupView.grouped(
@@ -39,6 +39,16 @@ module Thredded
       authorize @messageboard, :update?
       if @messageboard.update(messageboard_params)
         redirect_to messageboard_topics_path(@messageboard), notice: I18n.t('thredded.messageboard.updated_notice')
+      else
+        render :edit
+      end
+    end
+
+    def destroy
+      @messageboard = Thredded::Messageboard.friendly_find!(params[:id])
+      authorize @messageboard, :destroy? 
+      if @messageboard.destroy
+        redirect_to root_path
       else
         render :edit
       end
